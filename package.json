@@ -1,0 +1,11 @@
+{
+  "name": "tiktok-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Monitor diario de historias TikTok (Parte 1 / Parte 2) usando la API oficial de TikTok for Developers",
+  "scripts": {
+    "authorize": "node auth/authorize.mjs",
+    "check": "node agent/check-tiktok.mjs"
+  }
+}

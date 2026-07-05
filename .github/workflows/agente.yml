@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: agente-tiktok
@@ -36,13 +37,25 @@ jobs:
         run: node scripts/agente.mjs
 
       - name: Commit y push si hay cambios
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/latest.json data/history.json public/data.js
           if git diff --cached --quiet; then
             echo "Sin cambios en los datos."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "chore: actualizar estadísticas de TikTok [bot]"
             git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # Un push hecho con GITHUB_TOKEN no dispara otros workflows (anti-loop
+      # de GitHub Actions), así que deploy-pages.yml no se re-ejecutaría solo.
+      # Lo disparamos explícitamente vía la API para que Pages quede al día.
+      - name: Redisparar deploy de Pages
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-pages.yml --ref ${{ github.ref_name }}

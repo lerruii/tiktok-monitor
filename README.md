@@ -45,10 +45,15 @@ resto la próxima vez que hagas push a `main`.
 
 ## 3. (Opcional pero recomendado) Agregar el secret de Claude
 
-El agente primero intenta extraer los datos con una regex simple. Si TikTok
-cambia el formato de la página y eso falla, usa Claude como respaldo para
-leer el HTML y sacar los números igual. Sin este secret, esos casos quedan
-como error (puedes agregar las vistas a mano si hace falta).
+El agente primero intenta extraer los datos con una regex simple, **sin
+gastar ni un token** — Claude solo entra si esa regex falla (TikTok cambió
+el formato de la página). Sin este secret, esos casos quedan como error
+(puedes agregar las vistas a mano si hace falta).
+
+Cuando sí se usa, está optimizado para gastar lo mínimo: usa `claude-haiku-4-5`
+(el modelo más barato) y le manda solo el fragmento de JSON embebido en la
+página, no el HTML completo. En la práctica, con pocas historias, el costo
+mensual de esto es prácticamente cero.
 
 **Settings → Secrets and variables → Actions → New repository secret**
 - Name: `ANTHROPIC_API_KEY`

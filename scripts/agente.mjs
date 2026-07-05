@@ -79,11 +79,29 @@ function extractFromEmbeddedJson(html) {
   return null;
 }
 
+/**
+ * Recorta el HTML al fragmento con más probabilidad de contener el JSON de
+ * TikTok, en vez de mandarle la página completa a Claude (ahorra tokens en
+ * casi todos los casos, ya que esto solo corre cuando la regex ya falló).
+ */
+function isolateLikelyDataSnippet(html) {
+  const scriptMatch = html.match(
+    /<script id="(?:__UNIVERSAL_DATA_FOR_REHYDRATION__|SIGI_STATE)"[^>]*>([\s\S]*?)<\/script>/
+  );
+  if (scriptMatch) return scriptMatch[1].slice(0, 40000);
+
+  // Ningún <script> conocido: TikTok cambió el marcado. Mandamos un
+  // fragmento acotado del <body> en vez de la página entera (CSS/JS de
+  // terceros no aporta nada y solo infla el costo de la llamada).
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)/);
+  return (bodyMatch ? bodyMatch[1] : html).slice(0, 20000);
+}
+
 async function extractWithClaude(html, url) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
 
-  const snippet = html.slice(0, 60000);
+  const snippet = isolateLikelyDataSnippet(html);
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -92,15 +110,15 @@ async function extractWithClaude(html, url) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-5",
-      max_tokens: 500,
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 300,
       messages: [
         {
           role: "user",
-          content: `Este es el HTML crudo de una página de video de TikTok (${url}). Extrae exactamente estos campos del contenido embebido y responde SOLO con un JSON válido, nada más:
+          content: `Este es un fragmento de la página de un video de TikTok (${url}) que debería contener un JSON con sus estadísticas. Extrae exactamente estos campos y responde SOLO con un JSON válido, nada más:
 {"id": string|null, "title": string, "create_time": number|null (unix seconds), "view_count": number, "like_count": number, "comment_count": number, "share_count": number, "cover_image_url": string|null}
 
-HTML:
+Fragmento:
 ${snippet}`,
         },
       ],

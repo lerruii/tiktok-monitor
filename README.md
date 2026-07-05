@@ -1,115 +1,109 @@
 # TikTok Monitor
 
-Dashboard local que monitorea las historias de `@redditsincensura77` en TikTok:
-detecta automáticamente cuándo un video tiene "Parte 2" y grafica el histórico
-de vistas de cada uno. Los datos vienen de la **API oficial de TikTok for
-Developers** (no hay scraping ni bots) y un agente corre una vez al día para
-mantener todo actualizado.
+Dashboard que monitorea las historias de TikTok que agregues (pegando el link
+de cada video): trae vistas/likes/comentarios, detecta automáticamente cuándo
+un video tiene "Parte 2" por el título, y grafica el histórico. **No usa la
+API oficial de TikTok** — un agente lee la página pública de cada video que
+agregues. **Todo corre en GitHub**: no hay que dejar tu PC prendida ni instalar
+nada localmente.
 
 ## Cómo funciona
 
 ```
-auth/authorize.mjs   → una sola vez: conecta tu cuenta de TikTok (OAuth)
-agent/check-tiktok.mjs → corre a diario: trae tus videos + vistas, detecta Parte 1/2
-public/index.html     → dashboard que lees en el navegador
-scripts/install-task.ps1 → programa el paso anterior a diario en Windows
+public/               → el dashboard (GitHub Pages lo publica tal cual)
+data/links.json        → la lista de links que quieres monitorear (la editas desde el dashboard)
+data/latest.json        → snapshot más reciente, lo genera el agente
+data/history.json       → histórico diario de vistas, lo genera el agente
+scripts/agente.mjs      → el agente: abre cada link, extrae stats, agrupa Parte 1/2
+.github/workflows/agente.yml       → corre el agente todos los días + cuando agregas un link
+.github/workflows/deploy-pages.yml → publica public/ en GitHub Pages
 ```
 
-## 1. Crear la app en TikTok for Developers
+Flujo completo: pegas un link en el dashboard → tu navegador lo guarda directo
+en `data/links.json` vía la API de GitHub → eso dispara el workflow del agente
+→ el agente trae las estadísticas y las commitea → eso dispara el deploy de
+Pages → el dashboard se actualiza solo. Nunca corres nada en tu computadora.
 
-1. Entra a https://developers.tiktok.com/apps y crea una cuenta de developer si no tienes una (con tu cuenta de TikTok, `@redditsincensura77`).
-2. Crea una nueva App (cualquier nombre, ej. "Monitor Personal").
-3. Dentro de la app, agrega el producto **Login Kit**.
-4. En la configuración del Login Kit:
-   - Agrega el **Redirect URI**: `http://localhost:8787/callback`
-   - Activa los scopes: `user.info.basic` y `video.list`
-5. En **Target Users / Testers** (mientras la app no esté auditada por TikTok), agrega la cuenta `@redditsincensura77` como probador — si no la agregas ahí, el login del paso 3 más abajo fallará con "user not eligible".
-6. Copia el **Client Key** y **Client Secret** de la app.
+## 1. Hacer el repo público
 
-> Nota: mientras la app esté en modo "unaudited" (sin revisión de TikTok), solo las cuentas que agregues como Target Users podrán autorizarla. Para uso personal esto es suficiente y no requiere esperar la aprobación de TikTok.
+GitHub Pages gratis solo publica repos públicos (repos privados requieren
+GitHub Pro). Si este repo está privado: **Settings → General → Danger Zone →
+Change repository visibility → Public.**
 
-## 2. Configurar el proyecto
+> Esto significa que cualquiera con el link puede ver el dashboard, y que los
+> archivos `data/*.json` son visibles para cualquiera en GitHub. Si eso te
+> incomoda más adelante, la alternativa es pagar GitHub Pro o mover el hosting
+> a Cloudflare Pages/Vercel manteniendo el repo privado.
+
+## 2. Activar GitHub Pages
+
+**Settings → Pages → Build and deployment → Source → "GitHub Actions"**
+(no "Deploy from a branch"). El workflow `deploy-pages.yml` se encarga del
+resto la próxima vez que hagas push a `main`.
+
+## 3. (Opcional pero recomendado) Agregar el secret de Claude
+
+El agente primero intenta extraer los datos con una regex simple. Si TikTok
+cambia el formato de la página y eso falla, usa Claude como respaldo para
+leer el HTML y sacar los números igual. Sin este secret, esos casos quedan
+como error (puedes agregar las vistas a mano si hace falta).
+
+**Settings → Secrets and variables → Actions → New repository secret**
+- Name: `ANTHROPIC_API_KEY`
+- Value: tu API key de https://console.anthropic.com/settings/keys
+
+## 4. Subir este código
 
 ```powershell
-cd "tiktok-monitor"
-copy .env.example .env
+git add -A
+git commit -m "Migrar a agente 100% GitHub (sin API oficial de TikTok)"
+git push
 ```
 
-Abre `.env` y pega tu `Client Key` y `Client Secret`:
+## 5. Generar tu token para poder agregar videos desde el dashboard
 
-```
-TIKTOK_CLIENT_KEY=tu_client_key
-TIKTOK_CLIENT_SECRET=tu_client_secret
-TIKTOK_REDIRECT_URI=http://localhost:8787/callback
-```
+El dashboard necesita permiso para escribir en el repo cuando agregas un
+video. Crea un **fine-grained personal access token**:
 
-## 3. Conectar tu cuenta (una sola vez)
+1. https://github.com/settings/personal-access-tokens/new
+2. **Repository access** → Only select repositories → `tiktok-monitor`
+3. **Permissions → Repository permissions → Contents** → `Read and write`
+4. Genera el token y cópialo (empieza con `github_pat_...`) — solo lo verás una vez.
 
-```powershell
-npm run authorize
-```
+## 6. Configurar el dashboard
 
-Abre `http://localhost:8787` en tu navegador, haz click en **"Conectar con TikTok"**,
-inicia sesión como `@redditsincensura77` y aprueba los permisos. La ventana
-confirmará "Conectado ✅" y guarda el token en `data/tokens.json` (no lo
-compartas, es una credencial sensible).
+1. Abre tu Pages URL: `https://<tu-usuario>.github.io/tiktok-monitor/`
+2. Click en el ícono de engranaje (⚙) arriba a la derecha.
+3. Repositorio: `<tu-usuario>/tiktok-monitor`. Token: el que generaste. Guardar.
 
-El token de acceso dura 24h y el de refresco 1 año, pero **se renuevan solos**
-cada vez que el agente diario corre — no tendrás que repetir este paso salvo
-que dejes de correr el agente por más de un año.
+Esto se guarda solo en el navegador (localStorage) — nunca se sube a ningún
+lado ni lo ve nadie más.
 
-## 4. Probar el agente manualmente
+## 7. Agregar tu primer video
 
-```powershell
-npm run check
-```
-
-Esto trae tus videos reales, detecta series "Parte 1/2" por similitud de
-título, y actualiza:
-- `data/latest.json` — snapshot actual de todos tus videos
-- `data/history.json` — histórico diario de vistas/likes/comentarios/shares
-- `public/data.js` — lo que lee el dashboard
-
-## 5. Ver el dashboard
-
-Abre `public/index.html` directamente en el navegador, o sírvelo con cualquier
-servidor estático, por ejemplo:
-
-```powershell
-npx serve public
-```
-
-## 6. Automatizar (tarea diaria)
-
-Ya se instaló una tarea programada de Windows llamada **TikTokMonitorAgent**
-que corre `scripts/run-agent.cmd` todos los días a las **09:00** mientras tu
-usuario esté logueado en esta PC. El log queda en `logs/agent.log`.
-
-Comandos útiles:
-
-```powershell
-# Reinstalar / cambiar de hora (ej. 20:30)
-powershell -ExecutionPolicy Bypass -File .\scripts\install-task.ps1 -Time "20:30"
-
-# Quitar la tarea
-powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-task.ps1
-
-# Ver la tarea en el Programador de tareas de Windows
-schtasks /Query /TN TikTokMonitorAgent /V /FO LIST
-```
+Click en **"Agregar video"**, pega el link de TikTok, Guardar. En 1-2 minutos
+el agente corre automáticamente y verás las vistas aparecer al recargar la
+página (el workflow tarda un poco en completar; puedes ver el progreso en la
+pestaña **Actions** del repo).
 
 ## Cómo se detecta "Parte 2"
 
-El agente busca en el título de cada video un patrón `PT<numero>`, `Parte
-<numero>` o `Part <numero>` (ej. "... PT1 #historias"). Agrupa como la misma
-"serie" los videos cuyo texto previo a esa marca es muy similar (aunque no
-sea idéntico palabra por palabra), y marca la serie como completa cuando
-detecta tanto la Parte 1 como la Parte 2. Esto corre automáticamente sobre
-**todos** tus videos — no hace falta agregar links a mano; en cuanto publiques
-la Parte 2 de una historia, aparecerá emparejada en el próximo run del agente.
+El agente busca en el título/descripción de cada video un patrón `PT<numero>`,
+`Parte <numero>` o `Part <numero>`. Agrupa como la misma "serie" los videos
+cuyo texto previo a esa marca es muy similar, y marca la serie como completa
+cuando detecta tanto la Parte 1 como la Parte 2. Esto es automático: solo
+necesitas agregar el link de cada video, no hace falta decirle manualmente
+cuál es la Parte 2 de cuál.
 
-## Notas de seguridad
+## Limitaciones y notas
 
-- `data/tokens.json` y `.env` contienen credenciales — no los subas a ningún
-  repositorio ni los compartas.
-- Todo corre localmente en tu PC; nada se envía a servidores de terceros.
+- **No hay API oficial de por medio**: el agente lee la página pública del
+  video igual que lo haría un navegador. TikTok podría bloquear o cambiar el
+  formato en cualquier momento; si un link empieza a fallar (columna `errors`
+  en `data/latest.json`, o revisando el log del workflow en **Actions**), es
+  normal — vuelve a intentar más tarde o reporta el problema.
+- El agente corre una vez al día (09:00 hora Colombia/Perú/Ecuador) y también
+  cada vez que agregas un link nuevo. Puedes forzarlo manualmente desde
+  **Actions → Agente TikTok → Run workflow**.
+- Links acortados (`vm.tiktok.com/...`) también funcionan: el agente sigue el
+  redirect antes de leer la página.

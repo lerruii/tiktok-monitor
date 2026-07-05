@@ -287,5 +287,214 @@
     renderTable(latest.videos);
   }
 
+  // ---- GitHub-backed "agregar video" + configuración ----
+
+  const GH_API = "https://api.github.com";
+  const LINKS_PATH = "data/links.json";
+  const STORAGE_OWNER = "tiktokMonitor.ghRepo";
+  const STORAGE_TOKEN = "tiktokMonitor.ghToken";
+
+  function getSettings() {
+    return {
+      ownerRepo: localStorage.getItem(STORAGE_OWNER) || "",
+      token: localStorage.getItem(STORAGE_TOKEN) || "",
+    };
+  }
+
+  function saveSettings(ownerRepo, token) {
+    localStorage.setItem(STORAGE_OWNER, ownerRepo);
+    localStorage.setItem(STORAGE_TOKEN, token);
+  }
+
+  function clearToken() {
+    localStorage.removeItem(STORAGE_TOKEN);
+  }
+
+  function showToast(message, type) {
+    const stack = document.getElementById("toast-stack");
+    if (!stack) return;
+    const toast = el("div", `toast toast-${type || "success"}`, message);
+    stack.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+  }
+
+  function openModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.hidden = false;
+    const firstInput = modal.querySelector("input");
+    if (firstInput) firstInput.focus();
+  }
+
+  function closeModal(modal) {
+    modal.hidden = true;
+  }
+
+  function setFieldError(id, message) {
+    const box = document.getElementById(id);
+    if (!box) return;
+    if (!message) {
+      box.hidden = true;
+      box.textContent = "";
+    } else {
+      box.hidden = false;
+      box.textContent = message;
+    }
+  }
+
+  async function githubRequest(path, options) {
+    const { ownerRepo, token } = getSettings();
+    if (!ownerRepo || !token) {
+      throw new Error("Falta configurar el repositorio y el token en Configuración.");
+    }
+    const res = await fetch(`${GH_API}/repos/${ownerRepo}/${path}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        ...(options?.headers || {}),
+      },
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `Error de GitHub (HTTP ${res.status})`);
+    }
+    return res.json();
+  }
+
+  async function getLinksFile() {
+    try {
+      const data = await githubRequest(`contents/${LINKS_PATH}`, { method: "GET" });
+      const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+      return { content: Array.isArray(content) ? content : [], sha: data.sha };
+    } catch (err) {
+      if (String(err.message).includes("404")) return { content: [], sha: undefined };
+      throw err;
+    }
+  }
+
+  async function putLinksFile(links, sha, message) {
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(links, null, 2) + "\n")));
+    return githubRequest(`contents/${LINKS_PATH}`, {
+      method: "PUT",
+      body: JSON.stringify({ message, content: encoded, sha }),
+    });
+  }
+
+  function isValidTikTokUrl(value) {
+    try {
+      const u = new URL(value);
+      return /tiktok\.com$/i.test(u.hostname.replace(/^www\./, "")) || /vm\.tiktok\.com$/i.test(u.hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  function initGithubUI() {
+    const btnOpenAdd = document.getElementById("btn-open-add");
+    const btnOpenSettings = document.getElementById("btn-open-settings");
+    const modalAdd = document.getElementById("modal-add");
+    const modalSettings = document.getElementById("modal-settings");
+    const formAdd = document.getElementById("form-add");
+    const formSettings = document.getElementById("form-settings");
+    const inputOwner = document.getElementById("input-owner");
+    const inputToken = document.getElementById("input-token");
+    const inputLink = document.getElementById("input-link");
+
+    if (!btnOpenAdd || !modalAdd) return; // dashboard sin UI de edición
+
+    const { ownerRepo, token } = getSettings();
+    if (inputOwner) inputOwner.value = ownerRepo;
+    if (inputToken && token) inputToken.placeholder = "•••••••••••••• (guardado)";
+
+    btnOpenAdd.addEventListener("click", () => {
+      const { ownerRepo, token } = getSettings();
+      if (!ownerRepo || !token) {
+        showToast("Primero configura el repositorio y el token.", "error");
+        openModal("modal-settings");
+        return;
+      }
+      openModal("modal-add");
+    });
+
+    btnOpenSettings.addEventListener("click", () => openModal("modal-settings"));
+
+    document.querySelectorAll("[data-close-modal]").forEach((btn) => {
+      btn.addEventListener("click", () => closeModal(btn.closest(".modal-backdrop")));
+    });
+
+    [modalAdd, modalSettings].forEach((modal) => {
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal(modal);
+      });
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      [modalAdd, modalSettings].forEach((modal) => {
+        if (!modal.hidden) closeModal(modal);
+      });
+    });
+
+    formSettings.addEventListener("submit", (e) => {
+      e.preventDefault();
+      setFieldError("settings-error", "");
+      const owner = inputOwner.value.trim();
+      const tok = inputToken.value.trim();
+      if (!owner.includes("/")) {
+        setFieldError("settings-error", "Usa el formato usuario/repo, ej. lerruii/tiktok-monitor.");
+        return;
+      }
+      if (!tok) {
+        setFieldError("settings-error", "Pega tu token de GitHub.");
+        return;
+      }
+      saveSettings(owner, tok);
+      inputToken.value = "";
+      inputToken.placeholder = "•••••••••••••• (guardado)";
+      closeModal(modalSettings);
+      showToast("Configuración guardada en este navegador.", "success");
+    });
+
+    document.getElementById("btn-clear-token").addEventListener("click", () => {
+      clearToken();
+      inputToken.placeholder = "github_pat_...";
+      showToast("Token borrado de este navegador.", "success");
+    });
+
+    formAdd.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      setFieldError("add-error", "");
+      const url = inputLink.value.trim();
+      if (!isValidTikTokUrl(url)) {
+        setFieldError("add-error", "Pega un link válido de tiktok.com.");
+        return;
+      }
+
+      const submitBtn = document.getElementById("btn-submit-add");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Guardando...";
+      try {
+        const { content, sha } = await getLinksFile();
+        if (content.some((entry) => (typeof entry === "string" ? entry : entry.url) === url)) {
+          setFieldError("add-error", "Ese link ya está en la lista.");
+          return;
+        }
+        content.push({ url, addedAt: new Date().toISOString() });
+        await putLinksFile(content, sha, `feat: agregar video ${url}`);
+        inputLink.value = "";
+        closeModal(modalAdd);
+        showToast("Video agregado. El agente lo procesará en ~1-2 min.", "success");
+      } catch (err) {
+        setFieldError("add-error", err.message || "No se pudo guardar. Revisa el token y los permisos.");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Guardar";
+      }
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", main);
+  document.addEventListener("DOMContentLoaded", initGithubUI);
 })();

@@ -1,11 +1,10 @@
 {
   "name": "tiktok-monitor",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Monitor diario de historias TikTok (Parte 1 / Parte 2) usando la API oficial de TikTok for Developers",
+  "description": "Dashboard de GitHub Pages que monitorea vistas y detecta series Parte 1/2 de videos de TikTok agregados por link, actualizado por un agente de GitHub Actions",
   "scripts": {
-    "authorize": "node auth/authorize.mjs",
-    "check": "node agent/check-tiktok.mjs"
+    "agente": "node scripts/agente.mjs"
   }
 }

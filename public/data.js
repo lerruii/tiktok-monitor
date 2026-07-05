@@ -1,6 +1,6 @@
 // DATOS DE DEMOSTRACIÓN — este archivo lo sobrescribe automáticamente
-// agent/check-tiktok.mjs cada vez que corre con datos reales de la API de TikTok.
-// Sirve solo para previsualizar el dashboard antes de conectar la cuenta.
+// scripts/agente.mjs (vía GitHub Actions) cada vez que corre con datos reales.
+// Sirve solo para previsualizar el dashboard antes de agregar tus links.
 window.__TIKTOK_DATA__ = {
   "latest": {
     "generatedAt": "2026-07-04T06:00:00.000Z",

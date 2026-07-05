@@ -22,9 +22,18 @@
         <div class="brand-subtitle" id="account-label">@redditsincensura77 · vistas &amp; detección de Parte 2</div>
       </div>
     </div>
-    <div class="status-pill">
-      <span class="status-dot"></span>
-      <span id="last-updated">Sin datos todavía</span>
+    <div class="topbar-actions">
+      <div class="status-pill">
+        <span class="status-dot"></span>
+        <span id="last-updated">Sin datos todavía</span>
+      </div>
+      <button class="btn btn-primary" id="btn-open-add" type="button">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Agregar video
+      </button>
+      <button class="btn btn-icon" id="btn-open-settings" type="button" aria-label="Configuración">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.5-2-3.4-2.3.8a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.4a7.6 7.6 0 0 0-1.7 1l-2.3-.8-2 3.4L6.6 11a7.5 7.5 0 0 0 0 2l-2 1.5 2 3.4 2.3-.8c.5.4 1.1.75 1.7 1L11 21h4l.4-2.4c.6-.25 1.2-.6 1.7-1l2.3.8 2-3.4-2-1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </button>
     </div>
   </header>
 
@@ -65,9 +74,59 @@
   </div>
 
   <footer class="note">
-    Datos vía API oficial de TikTok for Developers (video.list). Generado automáticamente por el agente diario.
+    Datos obtenidos automáticamente de cada link de TikTok agregado. Actualizado por el agente de GitHub Actions.
   </footer>
 </div>
+
+<div class="modal-backdrop" id="modal-add" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-add-title">
+    <div class="modal-head">
+      <h2 id="modal-add-title">Agregar video</h2>
+      <button class="btn btn-icon" data-close-modal type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <form id="form-add">
+      <label class="field-label" for="input-link">Link de TikTok</label>
+      <input class="field-input" id="input-link" type="url" placeholder="https://www.tiktok.com/@usuario/video/1234567890123456789" required autocomplete="off" />
+      <p class="field-help">Se guarda directo en el repo. El agente trae las vistas automáticamente en menos de 2 minutos.</p>
+      <div id="add-error" class="field-error" role="alert" hidden></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-add">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-settings" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-settings-title">
+    <div class="modal-head">
+      <h2 id="modal-settings-title">Configuración</h2>
+      <button class="btn btn-icon" data-close-modal type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <form id="form-settings">
+      <label class="field-label" for="input-owner">Repositorio (usuario/repo)</label>
+      <input class="field-input" id="input-owner" type="text" placeholder="lerruii/tiktok-monitor" autocomplete="off" required />
+
+      <label class="field-label" for="input-token">Token de GitHub (fine-grained)</label>
+      <input class="field-input" id="input-token" type="password" placeholder="github_pat_..." autocomplete="off" required />
+      <p class="field-help">
+        Se guarda solo en este navegador (localStorage), nunca se envía a nadie más que a la API de GitHub.
+        Necesita permiso <strong>Contents: Read and write</strong> sobre este repo.
+      </p>
+      <div id="settings-error" class="field-error" role="alert" hidden></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="btn-clear-token">Borrar token guardado</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast-stack" id="toast-stack" aria-live="polite"></div>
 
 <script src="data.js" onerror="window.__TIKTOK_DATA__ = window.__TIKTOK_DATA__ || null"></script>
 <script src="app.js"></script>

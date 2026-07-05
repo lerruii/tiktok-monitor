@@ -238,15 +238,15 @@
 
   function renderEmptyState() {
     document.getElementById("kpi-grid").style.display = "none";
-    document.querySelector(".trend-panel").parentElement.style.display = "none";
-    document.getElementById("last-updated").textContent = "Sin conectar";
+    document.getElementById("trend-section").style.display = "none";
+    document.getElementById("last-updated").textContent = "Sin videos todavía";
     const container = document.getElementById("series-container");
     container.innerHTML = "";
     container.appendChild(
       el(
         "div",
         "empty-state",
-        `${ICONS.empty}<h3>Todavía no hay datos</h3><p>Conecta tu cuenta de TikTok ejecutando <code>npm run authorize</code> y luego <code>npm run check</code> (o espera a la tarea programada diaria) para ver aquí tus historias y vistas.</p>`
+        `${ICONS.empty}<h3>Todavía no hay videos</h3><p>Usa el botón <strong>"Agregar video"</strong> arriba y pega el link de tu primer video de TikTok. El agente traerá las vistas automáticamente en 1-2 minutos.</p>`
       )
     );
     document.getElementById("videos-hint").textContent = "0 videos";

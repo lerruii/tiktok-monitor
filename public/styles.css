@@ -400,6 +400,15 @@ svg { display: block; }
   flex-shrink: 0;
 }
 
+.series-thumb-youtube {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff4d4d;
+}
+
+.series-thumb-youtube svg { width: 24px; height: 24px; }
+
 .series-info { min-width: 0; flex: 1; }
 
 .series-title {
@@ -432,9 +441,35 @@ svg { display: block; }
 
 .part-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
   margin-top: 4px;
+}
+
+.part-block-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 96px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg-subtle);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  padding: 12px;
+  transition: border-color 150ms var(--ease), color 150ms var(--ease), background 150ms var(--ease);
+}
+
+.part-block-add svg { width: 18px; height: 18px; }
+
+.part-block-add:hover {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  background: rgba(99, 102, 241, 0.06);
 }
 
 .part-block {

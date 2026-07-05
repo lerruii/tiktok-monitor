@@ -11,6 +11,8 @@
     film: '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 4v16M16 4v16M3 9h5M16 9h5M3 15h5M16 15h5" stroke="currentColor" stroke-width="1.6"/></svg>',
     link: '<svg viewBox="0 0 24 24" fill="none"><path d="M10 14a4 4 0 0 0 6 0l2-2a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-2 2a4 4 0 0 0 6 6l1-1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
     empty: '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    youtube: '<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="4" stroke="currentColor" stroke-width="1.6"/><path d="M10 9.5v5l4.5-2.5-4.5-2.5Z" fill="currentColor"/></svg>',
   };
 
   function fmtNumber(n) {
@@ -23,6 +25,13 @@
   function fmtDate(unixSeconds) {
     if (!unixSeconds) return "—";
     const d = new Date(unixSeconds * 1000);
+    return d.toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" });
+  }
+
+  function fmtDateOnly(isoDate) {
+    if (!isoDate) return "—";
+    const d = new Date(`${isoDate}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return isoDate;
     return d.toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" });
   }
 
@@ -39,9 +48,10 @@
     return node;
   }
 
-  function historyForVideo(history, videoId) {
+  function historyForPart(history, storyId, part) {
+    const key = `${storyId}:${part}`;
     return history
-      .map((snap) => ({ date: snap.date, views: snap.videos?.[videoId]?.view_count }))
+      .map((snap) => ({ date: snap.date, views: snap.parts?.[key]?.view_count }))
       .filter((p) => p.views !== undefined);
   }
 
@@ -74,47 +84,49 @@
     });
   }
 
-  function partBlock(entry, history, isPrimary) {
-    if (!entry) {
-      return el(
-        "div",
-        "part-block empty",
-        `${ICONS.clock}<span>Esperando Parte 2</span>`
-      );
-    }
-    const v = entry.video;
+  function partBlock(part, storyId, history, colorIndex) {
+    const colors = ["#6366f1", "#25f4ee", "#fe2c55", "#f59e0b"];
+    const color = colors[colorIndex % colors.length];
     const block = el("div", "part-block");
     block.innerHTML = `
-      <div class="part-label">Parte ${entry.part}</div>
-      <div class="part-views nums">${fmtNumber(v.view_count)} <span style="font-weight:500;color:var(--fg-muted);font-size:11px;">vistas</span></div>
+      <div class="part-label">Parte ${part.part}</div>
+      <div class="part-views nums">${fmtNumber(part.view_count)} <span style="font-weight:500;color:var(--fg-muted);font-size:11px;">vistas</span></div>
       <div class="part-meta nums">
-        <span>${ICONS.heart}${fmtNumber(v.like_count)}</span>
-        <span>${ICONS.comment}${fmtNumber(v.comment_count)}</span>
-        <span>${ICONS.share}${fmtNumber(v.share_count)}</span>
+        <span>${ICONS.heart}${fmtNumber(part.like_count)}</span>
+        <span>${ICONS.comment}${fmtNumber(part.comment_count)}</span>
+        <span>${ICONS.share}${fmtNumber(part.share_count)}</span>
       </div>
       <div class="sparkline"><canvas></canvas></div>
-      <a class="card-link" href="${v.share_url ?? "#"}" target="_blank" rel="noopener">${ICONS.link}Ver en TikTok</a>
+      <a class="card-link" href="${part.share_url ?? part.url ?? "#"}" target="_blank" rel="noopener">${ICONS.link}Ver en TikTok</a>
     `;
-    const points = historyForVideo(history, v.id);
+    const points = historyForPart(history, storyId, part.part);
     const canvas = block.querySelector("canvas");
-    requestAnimationFrame(() => renderSparkline(canvas, points, isPrimary ? "#6366f1" : "#25f4ee"));
+    requestAnimationFrame(() => renderSparkline(canvas, points, color));
     return block;
   }
 
-  function renderSeriesCard(series, history) {
-    const part1 = series.parts.find((p) => p.part === 1) ?? series.parts[0];
-    const part2 = series.parts.find((p) => p.part === 2);
-    const cover = part1?.video?.cover_image_url;
+  function addPartTile(storyId, nextPart) {
+    const tile = el(
+      "button",
+      "part-block part-block-add",
+      `${ICONS.plus}<span>Agregar Parte ${nextPart}</span>`
+    );
+    tile.type = "button";
+    tile.dataset.storyId = storyId;
+    return tile;
+  }
 
+  function renderStoryCard(story, history) {
     const card = el("div", "series-card");
+    const hasPart2 = story.parts.length >= 2;
     card.innerHTML = `
       <div class="series-card-head">
-        ${cover ? `<img class="series-thumb" src="${cover}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<div class="series-thumb"></div>`}
+        <div class="series-thumb series-thumb-youtube">${ICONS.youtube}</div>
         <div class="series-info">
-          <div class="series-title">${series.title}</div>
-          <div class="series-date">Publicado ${fmtDate(part1?.video?.create_time)}</div>
+          <div class="series-title">${story.title}</div>
+          <div class="series-date">YouTube: ${fmtDateOnly(story.youtubeDate)}</div>
           ${
-            series.hasPart2
+            hasPart2
               ? `<span class="badge badge-success" style="margin-top:8px;">${ICONS.check}Parte 2 disponible</span>`
               : `<span class="badge badge-warning" style="margin-top:8px;">${ICONS.clock}Esperando Parte 2</span>`
           }
@@ -123,20 +135,21 @@
       <div class="part-row"></div>
     `;
     const row = card.querySelector(".part-row");
-    row.appendChild(partBlock(part1, history, true));
-    row.appendChild(partBlock(part2, history, false));
+    story.parts.forEach((part, i) => row.appendChild(partBlock(part, story.id, history, i)));
+    row.appendChild(addPartTile(story.id, story.parts.length + 1));
     return card;
   }
 
   function renderKpis(latest) {
     const grid = document.getElementById("kpi-grid");
-    const totalViews = latest.videos.reduce((sum, v) => sum + (v.view_count ?? 0), 0);
-    const withPart2 = latest.series.filter((s) => s.hasPart2).length;
+    const allParts = latest.stories.flatMap((s) => s.parts);
+    const totalViews = allParts.reduce((sum, p) => sum + (p.view_count ?? 0), 0);
+    const withPart2 = latest.stories.filter((s) => s.parts.length >= 2).length;
     const kpis = [
       { label: "Vistas totales", icon: ICONS.eye, value: fmtNumber(totalViews) },
-      { label: "Historias detectadas", icon: ICONS.layers, value: latest.series.length },
+      { label: "Historias", icon: ICONS.layers, value: latest.stories.length },
       { label: "Con parte 2 disponible", icon: ICONS.check, value: withPart2 },
-      { label: "Videos monitoreados", icon: ICONS.film, value: latest.videos.length },
+      { label: "Partes en TikTok", icon: ICONS.film, value: allParts.length },
     ];
     grid.innerHTML = kpis
       .map(
@@ -152,7 +165,7 @@
   function renderTrendChart(history) {
     const ctx = document.getElementById("trend-chart");
     const labels = history.map((h) => h.date);
-    const totals = history.map((h) => Object.values(h.videos ?? {}).reduce((s, m) => s + (m.view_count ?? 0), 0));
+    const totals = history.map((h) => Object.values(h.parts ?? {}).reduce((s, m) => s + (m.view_count ?? 0), 0));
     new Chart(ctx, {
       type: "line",
       data: {
@@ -195,15 +208,27 @@
     });
   }
 
-  function renderTable(videos) {
+  function renderTable(stories) {
     const tbody = document.getElementById("videos-tbody");
-    document.getElementById("videos-hint").textContent = `${videos.length} videos`;
+    const rows = stories.flatMap((story) =>
+      story.parts.map((part) => ({
+        story_title: story.title,
+        part: part.part,
+        create_time: part.create_time,
+        view_count: part.view_count,
+        like_count: part.like_count,
+        comment_count: part.comment_count,
+        share_count: part.share_count,
+        url: part.share_url ?? part.url,
+      }))
+    );
+    document.getElementById("videos-hint").textContent = `${rows.length} partes`;
 
     let sortKey = "view_count";
     let sortDir = -1;
 
     function draw() {
-      const sorted = [...videos].sort((a, b) => {
+      const sorted = [...rows].sort((a, b) => {
         const av = a[sortKey] ?? 0;
         const bv = b[sortKey] ?? 0;
         if (typeof av === "string") return sortDir * av.localeCompare(bv);
@@ -211,14 +236,15 @@
       });
       tbody.innerHTML = sorted
         .map(
-          (v) => `
+          (r) => `
         <tr>
-          <td class="td-title" title="${(v.title ?? "").replace(/"/g, "&quot;")}">${v.title ?? "(sin título)"}</td>
-          <td class="nums">${fmtDate(v.create_time)}</td>
-          <td class="nums">${fmtNumber(v.view_count)}</td>
-          <td class="nums">${fmtNumber(v.like_count)}</td>
-          <td class="nums">${fmtNumber(v.comment_count)}</td>
-          <td class="nums">${fmtNumber(v.share_count)}</td>
+          <td class="td-title" title="${(r.story_title ?? "").replace(/"/g, "&quot;")}">${r.story_title ?? "(sin título)"}</td>
+          <td class="nums">Parte ${r.part}</td>
+          <td class="nums">${fmtDate(r.create_time)}</td>
+          <td class="nums">${fmtNumber(r.view_count)}</td>
+          <td class="nums">${fmtNumber(r.like_count)}</td>
+          <td class="nums">${fmtNumber(r.comment_count)}</td>
+          <td class="nums">${fmtNumber(r.share_count)}</td>
         </tr>`
         )
         .join("");
@@ -239,22 +265,22 @@
   function renderEmptyState() {
     document.getElementById("kpi-grid").style.display = "none";
     document.getElementById("trend-section").style.display = "none";
-    document.getElementById("last-updated").textContent = "Sin videos todavía";
+    document.getElementById("last-updated").textContent = "Sin historias todavía";
     const container = document.getElementById("series-container");
     container.innerHTML = "";
     container.appendChild(
       el(
         "div",
         "empty-state",
-        `${ICONS.empty}<h3>Todavía no hay videos</h3><p>Usa el botón <strong>"Agregar video"</strong> arriba y pega el link de tu primer video de TikTok. El agente traerá las vistas automáticamente en 1-2 minutos.</p>`
+        `${ICONS.empty}<h3>Todavía no hay historias</h3><p>Usa el botón <strong>"Agregar historia"</strong> arriba: título, fecha de YouTube y el link de la Parte 1 en TikTok. El agente traerá las vistas automáticamente en 1-2 minutos.</p>`
       )
     );
-    document.getElementById("videos-hint").textContent = "0 videos";
+    document.getElementById("videos-hint").textContent = "0 partes";
   }
 
   function main() {
     const data = window.__TIKTOK_DATA__;
-    if (!data || !data.latest || !data.latest.videos || data.latest.videos.length === 0) {
+    if (!data || !data.latest || !data.latest.stories || data.latest.stories.length === 0) {
       renderEmptyState();
       return;
     }
@@ -267,30 +293,21 @@
     renderTrendChart(history);
 
     const seriesContainer = document.getElementById("series-container");
-    if (latest.series.length === 0) {
-      seriesContainer.appendChild(
-        el(
-          "div",
-          "empty-state",
-          `${ICONS.empty}<h3>Ninguna historia con formato "Parte 1/2" todavía</h3><p>Cuando publiques un video cuyo título incluya "PT1", "Parte 1", etc. aparecerá aquí automáticamente.</p>`
-        )
-      );
-    } else {
-      const grid = el("div", "series-grid");
-      latest.series
-        .slice()
-        .sort((a, b) => Number(b.hasPart2) - Number(a.hasPart2))
-        .forEach((s) => grid.appendChild(renderSeriesCard(s, history)));
-      seriesContainer.appendChild(grid);
-    }
+    seriesContainer.innerHTML = "";
+    const grid = el("div", "series-grid");
+    latest.stories
+      .slice()
+      .sort((a, b) => Number(a.parts.length >= 2) - Number(b.parts.length >= 2))
+      .forEach((s) => grid.appendChild(renderStoryCard(s, history)));
+    seriesContainer.appendChild(grid);
 
-    renderTable(latest.videos);
+    renderTable(latest.stories);
   }
 
-  // ---- GitHub-backed "agregar video" + configuración ----
+  // ---- GitHub-backed "agregar historia/parte" + configuración ----
 
   const GH_API = "https://api.github.com";
-  const LINKS_PATH = "data/links.json";
+  const STORIES_PATH = "data/stories.json";
   const STORAGE_OWNER = "tiktokMonitor.ghRepo";
   const STORAGE_TOKEN = "tiktokMonitor.ghToken";
 
@@ -322,7 +339,7 @@
     const modal = document.getElementById(id);
     if (!modal) return;
     modal.hidden = false;
-    const firstInput = modal.querySelector("input");
+    const firstInput = modal.querySelector("input:not([type=hidden])");
     if (firstInput) firstInput.focus();
   }
 
@@ -363,9 +380,9 @@
     return res.json();
   }
 
-  async function getLinksFile() {
+  async function getStoriesFile() {
     try {
-      const data = await githubRequest(`contents/${LINKS_PATH}`, { method: "GET" });
+      const data = await githubRequest(`contents/${STORIES_PATH}`, { method: "GET" });
       const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
       return { content: Array.isArray(content) ? content : [], sha: data.sha };
     } catch (err) {
@@ -374,9 +391,9 @@
     }
   }
 
-  async function putLinksFile(links, sha, message) {
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(links, null, 2) + "\n")));
-    return githubRequest(`contents/${LINKS_PATH}`, {
+  async function putStoriesFile(stories, sha, message) {
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(stories, null, 2) + "\n")));
+    return githubRequest(`contents/${STORIES_PATH}`, {
       method: "PUT",
       body: JSON.stringify({ message, content: encoded, sha }),
     });
@@ -391,40 +408,63 @@
     }
   }
 
+  function makeStoryId() {
+    return `story_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
   function initGithubUI() {
-    const btnOpenAdd = document.getElementById("btn-open-add");
+    const btnOpenAddStory = document.getElementById("btn-open-add-story");
     const btnOpenSettings = document.getElementById("btn-open-settings");
-    const modalAdd = document.getElementById("modal-add");
+    const modalAddStory = document.getElementById("modal-add-story");
+    const modalAddPart = document.getElementById("modal-add-part");
     const modalSettings = document.getElementById("modal-settings");
-    const formAdd = document.getElementById("form-add");
+    const formAddStory = document.getElementById("form-add-story");
+    const formAddPart = document.getElementById("form-add-part");
     const formSettings = document.getElementById("form-settings");
     const inputOwner = document.getElementById("input-owner");
     const inputToken = document.getElementById("input-token");
-    const inputLink = document.getElementById("input-link");
 
-    if (!btnOpenAdd || !modalAdd) return; // dashboard sin UI de edición
+    if (!btnOpenAddStory || !modalAddStory) return; // dashboard sin UI de edición
+
+    const allModals = [modalAddStory, modalAddPart, modalSettings];
 
     const { ownerRepo, token } = getSettings();
     if (inputOwner) inputOwner.value = ownerRepo;
     if (inputToken && token) inputToken.placeholder = "•••••••••••••• (guardado)";
 
-    btnOpenAdd.addEventListener("click", () => {
+    function requireConfigOrPrompt() {
       const { ownerRepo, token } = getSettings();
       if (!ownerRepo || !token) {
         showToast("Primero configura el repositorio y el token.", "error");
         openModal("modal-settings");
-        return;
+        return false;
       }
-      openModal("modal-add");
+      return true;
+    }
+
+    btnOpenAddStory.addEventListener("click", () => {
+      if (!requireConfigOrPrompt()) return;
+      openModal("modal-add-story");
     });
 
     btnOpenSettings.addEventListener("click", () => openModal("modal-settings"));
+
+    // Delegación: los botones "+ Agregar Parte N" se crean dinámicamente por tarjeta.
+    document.getElementById("series-container").addEventListener("click", (e) => {
+      const tile = e.target.closest(".part-block-add");
+      if (!tile) return;
+      if (!requireConfigOrPrompt()) return;
+      document.getElementById("input-part-story-id").value = tile.dataset.storyId;
+      const title = tile.closest(".series-card")?.querySelector(".series-title")?.textContent ?? "";
+      document.getElementById("add-part-story-label").textContent = `Historia: ${title}`;
+      openModal("modal-add-part");
+    });
 
     document.querySelectorAll("[data-close-modal]").forEach((btn) => {
       btn.addEventListener("click", () => closeModal(btn.closest(".modal-backdrop")));
     });
 
-    [modalAdd, modalSettings].forEach((modal) => {
+    allModals.forEach((modal) => {
       modal.addEventListener("click", (e) => {
         if (e.target === modal) closeModal(modal);
       });
@@ -432,7 +472,7 @@
 
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
-      [modalAdd, modalSettings].forEach((modal) => {
+      allModals.forEach((modal) => {
         if (!modal.hidden) closeModal(modal);
       });
     });
@@ -463,31 +503,83 @@
       showToast("Token borrado de este navegador.", "success");
     });
 
-    formAdd.addEventListener("submit", async (e) => {
+    formAddStory.addEventListener("submit", async (e) => {
       e.preventDefault();
-      setFieldError("add-error", "");
-      const url = inputLink.value.trim();
+      setFieldError("add-story-error", "");
+      const title = document.getElementById("input-story-title").value.trim();
+      const youtubeDate = document.getElementById("input-story-youtube-date").value;
+      const url = document.getElementById("input-story-link").value.trim();
+      if (!title) {
+        setFieldError("add-story-error", "Escribe un título.");
+        return;
+      }
+      if (!youtubeDate) {
+        setFieldError("add-story-error", "Selecciona la fecha de YouTube.");
+        return;
+      }
       if (!isValidTikTokUrl(url)) {
-        setFieldError("add-error", "Pega un link válido de tiktok.com.");
+        setFieldError("add-story-error", "Pega un link válido de tiktok.com.");
         return;
       }
 
-      const submitBtn = document.getElementById("btn-submit-add");
+      const submitBtn = document.getElementById("btn-submit-add-story");
       submitBtn.disabled = true;
       submitBtn.textContent = "Guardando...";
       try {
-        const { content, sha } = await getLinksFile();
-        if (content.some((entry) => (typeof entry === "string" ? entry : entry.url) === url)) {
-          setFieldError("add-error", "Ese link ya está en la lista.");
+        const { content, sha } = await getStoriesFile();
+        const now = new Date().toISOString();
+        content.push({
+          id: makeStoryId(),
+          title,
+          youtubeDate,
+          addedAt: now,
+          tiktokLinks: [{ part: 1, url, addedAt: now }],
+        });
+        await putStoriesFile(content, sha, `feat: agregar historia "${title}"`);
+        formAddStory.reset();
+        closeModal(modalAddStory);
+        showToast("Historia agregada. El agente la procesará en ~1-2 min.", "success");
+      } catch (err) {
+        setFieldError("add-story-error", err.message || "No se pudo guardar. Revisa el token y los permisos.");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Guardar";
+      }
+    });
+
+    formAddPart.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      setFieldError("add-part-error", "");
+      const storyId = document.getElementById("input-part-story-id").value;
+      const url = document.getElementById("input-part-link").value.trim();
+      if (!isValidTikTokUrl(url)) {
+        setFieldError("add-part-error", "Pega un link válido de tiktok.com.");
+        return;
+      }
+
+      const submitBtn = document.getElementById("btn-submit-add-part");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Guardando...";
+      try {
+        const { content, sha } = await getStoriesFile();
+        const story = content.find((s) => s.id === storyId);
+        if (!story) {
+          setFieldError("add-part-error", "No se encontró la historia (¿alguien más la editó? recarga la página).");
           return;
         }
-        content.push({ url, addedAt: new Date().toISOString() });
-        await putLinksFile(content, sha, `feat: agregar video ${url}`);
-        inputLink.value = "";
-        closeModal(modalAdd);
-        showToast("Video agregado. El agente lo procesará en ~1-2 min.", "success");
+        story.tiktokLinks = story.tiktokLinks ?? [];
+        if (story.tiktokLinks.some((l) => l.url === url)) {
+          setFieldError("add-part-error", "Ese link ya está agregado a esta historia.");
+          return;
+        }
+        const nextPart = story.tiktokLinks.length + 1;
+        story.tiktokLinks.push({ part: nextPart, url, addedAt: new Date().toISOString() });
+        await putStoriesFile(content, sha, `feat: agregar parte ${nextPart} a "${story.title}"`);
+        formAddPart.reset();
+        closeModal(modalAddPart);
+        showToast(`Parte ${nextPart} agregada. El agente la procesará en ~1-2 min.`, "success");
       } catch (err) {
-        setFieldError("add-error", err.message || "No se pudo guardar. Revisa el token y los permisos.");
+        setFieldError("add-part-error", err.message || "No se pudo guardar. Revisa el token y los permisos.");
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = "Guardar";

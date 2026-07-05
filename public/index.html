@@ -19,7 +19,7 @@
       </div>
       <div>
         <div class="brand-title">TikTok Monitor</div>
-        <div class="brand-subtitle" id="account-label">@redditsincensura77 · vistas &amp; detección de Parte 2</div>
+        <div class="brand-subtitle" id="account-label">Historias de YouTube · partes en TikTok · vistas &amp; detección de Parte 2</div>
       </div>
     </div>
     <div class="topbar-actions">
@@ -27,9 +27,9 @@
         <span class="status-dot"></span>
         <span id="last-updated">Sin datos todavía</span>
       </div>
-      <button class="btn btn-primary" id="btn-open-add" type="button">
+      <button class="btn btn-primary" id="btn-open-add-story" type="button">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        Agregar video
+        Agregar historia
       </button>
       <button class="btn btn-icon" id="btn-open-settings" type="button" aria-label="Configuración">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.5-2-3.4-2.3.8a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.4a7.6 7.6 0 0 0-1.7 1l-2.3-.8-2 3.4L6.6 11a7.5 7.5 0 0 0 0 2l-2 1.5 2 3.4 2.3-.8c.5.4 1.1.75 1.7 1L11 21h4l.4-2.4c.6-.25 1.2-.6 1.7-1l2.3.8 2-3.4-2-1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
@@ -50,21 +50,22 @@
   </div>
 
   <div class="section-head">
-    <div class="section-title">Historias detectadas</div>
-    <div class="section-hint">Agrupadas automáticamente por título · Parte 1 / Parte 2</div>
+    <div class="section-title">Historias</div>
+    <div class="section-hint">Video de YouTube + sus partes publicadas en TikTok</div>
   </div>
   <div id="series-container"></div>
 
   <div class="section-head">
-    <div class="section-title">Todos los videos</div>
+    <div class="section-title">Todas las partes de TikTok</div>
     <div class="section-hint" id="videos-hint"></div>
   </div>
   <div class="table-wrap">
     <table id="videos-table">
       <thead>
         <tr>
-          <th data-sort="title">Título</th>
-          <th data-sort="create_time">Publicado</th>
+          <th data-sort="story_title">Historia</th>
+          <th data-sort="part">Parte</th>
+          <th data-sort="create_time">Publicado en TikTok</th>
           <th data-sort="view_count">Vistas</th>
           <th data-sort="like_count">Likes</th>
           <th data-sort="comment_count">Comentarios</th>
@@ -80,22 +81,50 @@
   </footer>
 </div>
 
-<div class="modal-backdrop" id="modal-add" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-add-title">
+<div class="modal-backdrop" id="modal-add-story" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-add-story-title">
     <div class="modal-head">
-      <h2 id="modal-add-title">Agregar video</h2>
+      <h2 id="modal-add-story-title">Agregar historia</h2>
       <button class="btn btn-icon" data-close-modal type="button" aria-label="Cerrar">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
     </div>
-    <form id="form-add">
-      <label class="field-label" for="input-link">Link de TikTok</label>
-      <input class="field-input" id="input-link" type="url" placeholder="https://www.tiktok.com/@usuario/video/1234567890123456789" required autocomplete="off" />
+    <form id="form-add-story">
+      <label class="field-label" for="input-story-title">Título</label>
+      <input class="field-input" id="input-story-title" type="text" placeholder="Mi Esposo Decía Que Yo Estaba..." required autocomplete="off" />
+
+      <label class="field-label" for="input-story-youtube-date">Fecha de subida en YouTube</label>
+      <input class="field-input" id="input-story-youtube-date" type="date" required />
+
+      <label class="field-label" for="input-story-link">Link de TikTok (Parte 1)</label>
+      <input class="field-input" id="input-story-link" type="url" placeholder="https://www.tiktok.com/@usuario/video/1234567890123456789" required autocomplete="off" />
       <p class="field-help">Se guarda directo en el repo. El agente trae las vistas automáticamente en menos de 2 minutos.</p>
-      <div id="add-error" class="field-error" role="alert" hidden></div>
+      <div id="add-story-error" class="field-error" role="alert" hidden></div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
-        <button type="submit" class="btn btn-primary" id="btn-submit-add">Guardar</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-add-story">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-add-part" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-add-part-title">
+    <div class="modal-head">
+      <h2 id="modal-add-part-title">Agregar parte</h2>
+      <button class="btn btn-icon" data-close-modal type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <form id="form-add-part">
+      <input type="hidden" id="input-part-story-id" />
+      <p class="field-help" id="add-part-story-label" style="margin-top:0;"></p>
+      <label class="field-label" for="input-part-link">Link de TikTok</label>
+      <input class="field-input" id="input-part-link" type="url" placeholder="https://www.tiktok.com/@usuario/video/1234567890123456789" required autocomplete="off" />
+      <div id="add-part-error" class="field-error" role="alert" hidden></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-add-part">Guardar</button>
       </div>
     </form>
   </div>

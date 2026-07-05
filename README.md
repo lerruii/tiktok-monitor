@@ -1,28 +1,30 @@
 # TikTok Monitor
 
-Dashboard que monitorea las historias de TikTok que agregues (pegando el link
-de cada video): trae vistas/likes/comentarios, detecta automáticamente cuándo
-un video tiene "Parte 2" por el título, y grafica el histórico. **No usa la
-API oficial de TikTok** — un agente lee la página pública de cada video que
-agregues. **Todo corre en GitHub**: no hay que dejar tu PC prendida ni instalar
-nada localmente.
+Dashboard que monitorea **historias**: un video largo de YouTube (Reddit
+story) que luego publicas en TikTok en partes (Parte 1, Parte 2, ...). Por
+cada historia guardas el título + fecha de YouTube, y agregas el link de
+TikTok de cada parte; el agente trae vistas/likes/comentarios de cada parte
+automáticamente y grafica el histórico. **No usa la API oficial de TikTok**
+— un agente lee la página pública de cada video que agregues. **Todo corre
+en GitHub**: no hay que dejar tu PC prendida ni instalar nada localmente.
 
 ## Cómo funciona
 
 ```
-public/               → el dashboard (GitHub Pages lo publica tal cual)
-data/links.json        → la lista de links que quieres monitorear (la editas desde el dashboard)
+public/                → el dashboard (GitHub Pages lo publica tal cual)
+data/stories.json       → tus historias + los links de TikTok de cada parte (lo editas desde el dashboard)
 data/latest.json        → snapshot más reciente, lo genera el agente
-data/history.json       → histórico diario de vistas, lo genera el agente
-scripts/agente.mjs      → el agente: abre cada link, extrae stats, agrupa Parte 1/2
-.github/workflows/agente.yml       → corre el agente todos los días + cuando agregas un link
+data/history.json       → histórico diario de vistas por parte, lo genera el agente
+scripts/agente.mjs      → el agente: abre cada link de TikTok, extrae stats
+.github/workflows/agente.yml       → corre el agente todos los días + cuando agregas una historia/parte
 .github/workflows/deploy-pages.yml → publica public/ en GitHub Pages
 ```
 
-Flujo completo: pegas un link en el dashboard → tu navegador lo guarda directo
-en `data/links.json` vía la API de GitHub → eso dispara el workflow del agente
-→ el agente trae las estadísticas y las commitea → eso dispara el deploy de
-Pages → el dashboard se actualiza solo. Nunca corres nada en tu computadora.
+Flujo completo: agregas una historia (o una parte nueva) en el dashboard →
+tu navegador lo guarda directo en `data/stories.json` vía la API de GitHub →
+eso dispara el workflow del agente → el agente trae las estadísticas de cada
+link de TikTok y las commitea → eso dispara el deploy de Pages → el
+dashboard se actualiza solo. Nunca corres nada en tu computadora.
 
 ## 1. Hacer el repo público
 
@@ -56,14 +58,14 @@ como error (puedes agregar las vistas a mano si hace falta).
 
 ```powershell
 git add -A
-git commit -m "Migrar a agente 100% GitHub (sin API oficial de TikTok)"
+git commit -m "Modelo de historias (YouTube + partes de TikTok)"
 git push
 ```
 
-## 5. Generar tu token para poder agregar videos desde el dashboard
+## 5. Generar tu token para poder agregar historias desde el dashboard
 
-El dashboard necesita permiso para escribir en el repo cuando agregas un
-video. Crea un **fine-grained personal access token**:
+El dashboard necesita permiso para escribir en el repo cuando agregas una
+historia o una parte nueva. Crea un **fine-grained personal access token**:
 
 1. https://github.com/settings/personal-access-tokens/new
 2. **Repository access** → Only select repositories → `tiktok-monitor`
@@ -79,21 +81,17 @@ video. Crea un **fine-grained personal access token**:
 Esto se guarda solo en el navegador (localStorage) — nunca se sube a ningún
 lado ni lo ve nadie más.
 
-## 7. Agregar tu primer video
+## 7. Agregar tu primera historia
 
-Click en **"Agregar video"**, pega el link de TikTok, Guardar. En 1-2 minutos
-el agente corre automáticamente y verás las vistas aparecer al recargar la
-página (el workflow tarda un poco en completar; puedes ver el progreso en la
-pestaña **Actions** del repo).
+Click en **"Agregar historia"**: título, fecha de subida en YouTube, y el
+link de TikTok de la Parte 1. Guardar. En 1-2 minutos el agente corre
+automáticamente y verás las vistas aparecer al recargar la página (el
+workflow tarda un poco en completar; puedes ver el progreso en la pestaña
+**Actions** del repo).
 
-## Cómo se detecta "Parte 2"
-
-El agente busca en el título/descripción de cada video un patrón `PT<numero>`,
-`Parte <numero>` o `Part <numero>`. Agrupa como la misma "serie" los videos
-cuyo texto previo a esa marca es muy similar, y marca la serie como completa
-cuando detecta tanto la Parte 1 como la Parte 2. Esto es automático: solo
-necesitas agregar el link de cada video, no hace falta decirle manualmente
-cuál es la Parte 2 de cuál.
+Cuando publiques la Parte 2 (o 3, 4...) de esa misma historia, entra a su
+tarjeta en el dashboard y click en **"+ Agregar Parte N"** dentro de la
+tarjeta — solo pide el link, no hace falta repetir título ni fecha.
 
 ## Limitaciones y notas
 
@@ -103,7 +101,9 @@ cuál es la Parte 2 de cuál.
   en `data/latest.json`, o revisando el log del workflow en **Actions**), es
   normal — vuelve a intentar más tarde o reporta el problema.
 - El agente corre una vez al día (09:00 hora Colombia/Perú/Ecuador) y también
-  cada vez que agregas un link nuevo. Puedes forzarlo manualmente desde
-  **Actions → Agente TikTok → Run workflow**.
+  cada vez que agregas una historia o una parte nueva. Puedes forzarlo
+  manualmente desde **Actions → Agente TikTok → Run workflow**.
 - Links acortados (`vm.tiktok.com/...`) también funcionan: el agente sigue el
   redirect antes de leer la página.
+- La fecha de YouTube es un dato manual (no se trackean vistas de YouTube por
+  ahora, solo se guarda como referencia junto al título de la historia).

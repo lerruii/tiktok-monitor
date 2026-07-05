@@ -1,12 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { groupIntoSeries } from "../lib/series.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const DATA_DIR = path.join(ROOT, "data");
 const PUBLIC_DIR = path.join(ROOT, "public");
-const LINKS_FILE = path.join(DATA_DIR, "links.json");
+const STORIES_FILE = path.join(DATA_DIR, "stories.json");
 const LATEST_FILE = path.join(DATA_DIR, "latest.json");
 const HISTORY_FILE = path.join(DATA_DIR, "history.json");
 const DATA_JS_FILE = path.join(PUBLIC_DIR, "data.js");
@@ -140,7 +139,7 @@ async function fetchVideoStats(url) {
   return {
     ok: true,
     source,
-    video: {
+    stats: {
       id: stats.id || idMatch?.[1] || finalUrl,
       title: stats.title || "",
       create_time: stats.create_time,
@@ -158,53 +157,59 @@ async function main() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 
-  const links = readJson(LINKS_FILE, []);
-  const videos = [];
+  const stories = readJson(STORIES_FILE, []);
   const errors = [];
+  const resultStories = [];
 
-  for (const link of links) {
-    const url = typeof link === "string" ? link : link.url;
-    if (!url) continue;
-    try {
-      const result = await fetchVideoStats(url);
-      if (result.error) {
-        errors.push(result.error);
-        continue;
+  for (const story of stories) {
+    const parts = [];
+    for (const link of story.tiktokLinks ?? []) {
+      try {
+        const result = await fetchVideoStats(link.url);
+        if (result.error) {
+          errors.push(result.error);
+          continue;
+        }
+        parts.push({ part: link.part, url: link.url, ...result.stats });
+        console.log(`[ok:${result.source}] ${story.title} · Parte ${link.part} -> ${result.stats.view_count} vistas`);
+      } catch (err) {
+        errors.push(`${link.url}: ${err.message ?? err}`);
       }
-      videos.push(result.video);
-      console.log(`[ok:${result.source}] ${url} -> ${result.video.view_count} vistas`);
-    } catch (err) {
-      errors.push(`${url}: ${err.message ?? err}`);
+      // pequeña pausa entre requests para no golpear TikTok de forma agresiva
+      await new Promise((r) => setTimeout(r, 1500));
     }
-    // pequeña pausa entre requests para no golpear TikTok de forma agresiva
-    await new Promise((r) => setTimeout(r, 1500));
+    parts.sort((a, b) => (a.part ?? 0) - (b.part ?? 0));
+    resultStories.push({
+      id: story.id,
+      title: story.title,
+      youtubeDate: story.youtubeDate ?? null,
+      parts,
+    });
   }
-
-  videos.sort((a, b) => (a.create_time ?? 0) - (b.create_time ?? 0));
-  const series = groupIntoSeries(videos);
 
   const date = todayLocal();
   const history = readJson(HISTORY_FILE, []);
-  const snapshotVideos = {};
-  for (const v of videos) {
-    snapshotVideos[v.id] = {
-      view_count: v.view_count,
-      like_count: v.like_count,
-      comment_count: v.comment_count,
-      share_count: v.share_count,
-    };
+  const snapshotParts = {};
+  for (const story of resultStories) {
+    for (const p of story.parts) {
+      snapshotParts[`${story.id}:${p.part}`] = {
+        view_count: p.view_count,
+        like_count: p.like_count,
+        comment_count: p.comment_count,
+        share_count: p.share_count,
+      };
+    }
   }
   const todayIndex = history.findIndex((entry) => entry.date === date);
-  const todaySnapshot = { date, videos: snapshotVideos };
+  const todaySnapshot = { date, parts: snapshotParts };
   if (todayIndex === -1) history.push(todaySnapshot);
   else history[todayIndex] = todaySnapshot;
   history.sort((a, b) => a.date.localeCompare(b.date));
 
   const latest = {
     generatedAt: new Date().toISOString(),
-    totalVideos: videos.length,
-    videos,
-    series,
+    totalStories: resultStories.length,
+    stories: resultStories,
     errors,
   };
 
@@ -212,9 +217,10 @@ async function main() {
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
   fs.writeFileSync(DATA_JS_FILE, `window.__TIKTOK_DATA__ = ${JSON.stringify({ latest, history })};\n`);
 
-  const withPart2 = series.filter((s) => s.hasPart2).length;
+  const totalParts = resultStories.reduce((s, story) => s + story.parts.length, 0);
+  const withPart2 = resultStories.filter((s) => s.parts.length >= 2).length;
   console.log(
-    `[${new Date().toISOString()}] OK: ${videos.length}/${links.length} videos, ${series.length} series, ${withPart2} con parte 2, ${errors.length} errores.`
+    `[${new Date().toISOString()}] OK: ${resultStories.length} historias, ${totalParts} partes de TikTok, ${withPart2} con parte 2, ${errors.length} errores.`
   );
   if (errors.length) console.log("Errores:", errors.join(" | "));
 }

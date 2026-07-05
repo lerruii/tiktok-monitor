@@ -13,6 +13,7 @@
     empty: '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     plus: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     youtube: '<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="4" stroke="currentColor" stroke-width="1.6"/><path d="M10 9.5v5l4.5-2.5-4.5-2.5Z" fill="currentColor"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   };
 
   function fmtNumber(n) {
@@ -120,6 +121,7 @@
     const card = el("div", "series-card");
     const hasPart2 = story.parts.length >= 2;
     card.innerHTML = `
+      <button class="btn-delete-story" type="button" data-story-id="${story.id}" aria-label="Borrar historia">${ICONS.trash}</button>
       <div class="series-card-head">
         <div class="series-thumb series-thumb-youtube">${ICONS.youtube}</div>
         <div class="series-info">
@@ -417,6 +419,7 @@
     const btnOpenSettings = document.getElementById("btn-open-settings");
     const modalAddStory = document.getElementById("modal-add-story");
     const modalAddPart = document.getElementById("modal-add-part");
+    const modalConfirmDelete = document.getElementById("modal-confirm-delete");
     const modalSettings = document.getElementById("modal-settings");
     const formAddStory = document.getElementById("form-add-story");
     const formAddPart = document.getElementById("form-add-part");
@@ -426,7 +429,7 @@
 
     if (!btnOpenAddStory || !modalAddStory) return; // dashboard sin UI de edición
 
-    const allModals = [modalAddStory, modalAddPart, modalSettings];
+    const allModals = [modalAddStory, modalAddPart, modalConfirmDelete, modalSettings];
 
     const { ownerRepo, token } = getSettings();
     if (inputOwner) inputOwner.value = ownerRepo;
@@ -449,15 +452,27 @@
 
     btnOpenSettings.addEventListener("click", () => openModal("modal-settings"));
 
-    // Delegación: los botones "+ Agregar Parte N" se crean dinámicamente por tarjeta.
+    // Delegación: los botones "+ Agregar Parte N" y "Borrar" se crean dinámicamente por tarjeta.
     document.getElementById("series-container").addEventListener("click", (e) => {
       const tile = e.target.closest(".part-block-add");
-      if (!tile) return;
-      if (!requireConfigOrPrompt()) return;
-      document.getElementById("input-part-story-id").value = tile.dataset.storyId;
-      const title = tile.closest(".series-card")?.querySelector(".series-title")?.textContent ?? "";
-      document.getElementById("add-part-story-label").textContent = `Historia: ${title}`;
-      openModal("modal-add-part");
+      if (tile) {
+        if (!requireConfigOrPrompt()) return;
+        document.getElementById("input-part-story-id").value = tile.dataset.storyId;
+        const title = tile.closest(".series-card")?.querySelector(".series-title")?.textContent ?? "";
+        document.getElementById("add-part-story-label").textContent = `Historia: ${title}`;
+        openModal("modal-add-part");
+        return;
+      }
+
+      const deleteBtn = e.target.closest(".btn-delete-story");
+      if (deleteBtn) {
+        if (!requireConfigOrPrompt()) return;
+        document.getElementById("input-delete-story-id").value = deleteBtn.dataset.storyId;
+        const title = deleteBtn.closest(".series-card")?.querySelector(".series-title")?.textContent ?? "";
+        document.getElementById("delete-story-label").textContent = `Historia: ${title}`;
+        setFieldError("delete-story-error", "");
+        openModal("modal-confirm-delete");
+      }
     });
 
     document.querySelectorAll("[data-close-modal]").forEach((btn) => {
@@ -583,6 +598,31 @@
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = "Guardar";
+      }
+    });
+
+    document.getElementById("btn-confirm-delete-story").addEventListener("click", async () => {
+      setFieldError("delete-story-error", "");
+      const storyId = document.getElementById("input-delete-story-id").value;
+      const btnConfirm = document.getElementById("btn-confirm-delete-story");
+      btnConfirm.disabled = true;
+      btnConfirm.textContent = "Borrando...";
+      try {
+        const { content, sha } = await getStoriesFile();
+        const story = content.find((s) => s.id === storyId);
+        const filtered = content.filter((s) => s.id !== storyId);
+        if (filtered.length === content.length) {
+          setFieldError("delete-story-error", "No se encontró la historia (¿alguien más la editó? recarga la página).");
+          return;
+        }
+        await putStoriesFile(filtered, sha, `chore: borrar historia "${story?.title ?? storyId}"`);
+        closeModal(modalConfirmDelete);
+        showToast("Historia borrada. El dashboard se actualiza en ~1-2 min.", "success");
+      } catch (err) {
+        setFieldError("delete-story-error", err.message || "No se pudo borrar. Revisa el token y los permisos.");
+      } finally {
+        btnConfirm.disabled = false;
+        btnConfirm.textContent = "Borrar historia";
       }
     });
   }

@@ -130,6 +130,25 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="modal-confirm-delete" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-confirm-delete-title">
+    <div class="modal-head">
+      <h2 id="modal-confirm-delete-title">Borrar historia</h2>
+      <button class="btn btn-icon" data-close-modal type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <input type="hidden" id="input-delete-story-id" />
+    <p class="field-help" id="delete-story-label" style="margin-top:0;"></p>
+    <p class="field-help">Se borra la historia y todas sus partes de TikTok del repo. No se puede deshacer.</p>
+    <div id="delete-story-error" class="field-error" role="alert" hidden></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+      <button type="button" class="btn btn-danger" id="btn-confirm-delete-story">Borrar historia</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-settings" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-settings-title">
     <div class="modal-head">
